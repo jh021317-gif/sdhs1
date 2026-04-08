@@ -1412,6 +1412,21 @@
 
                 const config = ROOM_CONFIGS[roomName] || { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] };
                 const storageKey = `yajaArrangement1_${currentDay}_${roomName}_P${currentPeriod}`;
+                // Hotfix for 10720 cache issue
+                if (localStorage.getItem(storageKey)) {
+                    let arr = JSON.parse(localStorage.getItem(storageKey));
+                    let changed = false;
+                    for (let i = 0; i < arr.length; i++) {
+                        if (arr[i] === "10720" || arr[i] === 10720) {
+                            arr[i] = null;
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        localStorage.setItem(storageKey, JSON.stringify(arr));
+                    }
+                }
+
                 let savedIds = JSON.parse(localStorage.getItem(storageKey));
 
                 // 총 그리드 슬롯 계산 (5행 * 8열 = 40개 슬롯)
@@ -1438,24 +1453,25 @@
                 } else {
                     // 데이터 기반 수직 배치 (1분단 1~5, 2분단 6~10...)
                     if (savedIds) localStorage.removeItem(storageKey);
-
-                    students.forEach(s => {
-                        if (s.seatNum) {
-                            const cIdx = Math.floor((s.seatNum - 1) / 5);
-                            const row = (s.seatNum - 1) % 5;
-                            if (cIdx < config.gridCols.length) {
-                                const col = config.gridCols[cIdx];
-                                const gridIdx = row * 8 + col;
-                                if (gridSeats[gridIdx] === null) {
-                                    gridSeats[gridIdx] = s;
-                                    delete currentStudentMap[s.학번];
-                                }
-                            }
-                        }
-                    });
                 }
 
-                // 남은 학생 배치 (이미 배정 안 된 학생)
+                // 데이터(seatNum) 기반으로 남은 학생들 명시된 좌석에 먼저 배치 (우선 적용)
+                Object.values(currentStudentMap).forEach(s => {
+                    if (s.seatNum) {
+                        const cIdx = Math.floor((s.seatNum - 1) / 5);
+                        const row = (s.seatNum - 1) % 5;
+                        if (cIdx < config.gridCols.length) {
+                            const col = config.gridCols[cIdx];
+                            const gridIdx = row * 8 + col;
+                            if (gridSeats[gridIdx] === null) {
+                                gridSeats[gridIdx] = s;
+                                delete currentStudentMap[s.학번];
+                            }
+                        }
+                    }
+                });
+
+                // 그래도 남은 학생 배치 (이미 배정 안 된 학생은 빈자리에 순서대로)
                 Object.values(currentStudentMap).forEach(s => {
                     const firstEmpty = gridSeats.indexOf(null);
                     if (firstEmpty !== -1) gridSeats[firstEmpty] = s;
