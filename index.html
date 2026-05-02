@@ -885,6 +885,7 @@
                 grid-template-columns: repeat(6, 1fr);
                 gap: 8px;
                 margin: 20px 0;
+                min-width: 480px; /* Ensure it is wide enough to show all 6 columns nicely */
             }
 
             .grid-6x5 .spacer {
@@ -1362,7 +1363,9 @@
                         </div>
                     </div>
                     <div class="blackboard">칠판</div>
-                    <div class="grid-6x5" style="grid-template-rows: repeat(${config.maxRows}, 1fr);"></div>
+                    <div style="width: 100%; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch;">
+                        <div class="grid-6x5" style="grid-template-rows: repeat(${config.maxRows}, 1fr);"></div>
+                    </div>
                 `;
 
                 const grid = section.querySelector('.grid-6x5');
