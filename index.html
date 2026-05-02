@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 
 <head>
@@ -340,7 +340,6 @@
             background: #ffffff;
             font-size: 0.85rem;
             position: relative;
-            cursor: move;
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             user-select: none;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -377,13 +376,6 @@
             background: #f1f5f9;
             box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.04);
             cursor: default;
-        }
-
-        .seat.drag-over {
-            background-color: var(--drag-over);
-            border-color: var(--primary);
-            border-style: solid;
-            transform: scale(1.02);
         }
 
         .student-id {
@@ -1066,8 +1058,6 @@
                     <button class="btn btn-primary" id="btnSaveAllSheets" onclick="saveAllAttendanceToSheet()"
                         style="background: #0f172a; border-color: #0f172a; color: white;">💾 1-5, 1-6 시트 동시 전송</button>
                     <button class="btn btn-primary" onclick="window.print()">🖨️ A4 인쇄하기</button>
-                    <button class="btn btn-danger" id="btnResetArrangement" onclick="resetArrangement()">🔄 배치
-                        초기화</button>
                     <button class="btn btn-danger" id="btnResetAttendance" onclick="resetAttendance()">🗑️ 결석
                         초기화</button>
                 </div>
@@ -1183,6 +1173,11 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // 초기 접속 시 요일 탭 활성화 상태 동기화
+            document.querySelectorAll('.day-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.day === initialDay);
+            });
+
             fetchSpreadsheetData();
             if (supervisorName) {
                 document.getElementById('loginOverlay').style.display = 'none';
@@ -1317,23 +1312,6 @@
                 if (students.length === 0 && (roomName === '1-3' || roomName === '1-4')) return;
 
                 const config = ROOM_CONFIGS[roomName] || { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] };
-                const storageKey = `yajaArrangement1_${currentDay}_${roomName}_P${currentPeriod}`;
-                // Hotfix for 10720 & 10211 cache issue
-                if (localStorage.getItem(storageKey)) {
-                    let arr = JSON.parse(localStorage.getItem(storageKey));
-                    let changed = false;
-                    for (let i = 0; i < arr.length; i++) {
-                        if (arr[i] === "10720" || arr[i] === 10720 || arr[i] === "10211" || arr[i] === 10211) {
-                            arr[i] = null;
-                            changed = true;
-                        }
-                    }
-                    if (changed) {
-                        localStorage.setItem(storageKey, JSON.stringify(arr));
-                    }
-                }
-
-                let savedIds = JSON.parse(localStorage.getItem(storageKey));
 
                 // 총 그리드 슬롯 계산 (5행 * 8열 = 40개 슬롯)
                 let gridSeats = new Array(config.maxRows * 8).fill(undefined);
@@ -1347,19 +1325,6 @@
 
                 const currentStudentMap = {};
                 students.forEach(s => currentStudentMap[s.학번] = s);
-
-                if (savedIds && savedIds.length === gridSeats.length) {
-                    // 저장된 배치가 있고 새 레이아웃 규격과 맞으면 매칭
-                    savedIds.forEach((id, idx) => {
-                        if (id && currentStudentMap[id] && gridSeats[idx] !== undefined) {
-                            gridSeats[idx] = currentStudentMap[id];
-                            delete currentStudentMap[id];
-                        }
-                    });
-                } else {
-                    // 데이터 기반 수직 배치 (1분단 1~5, 2분단 6~10...)
-                    if (savedIds) localStorage.removeItem(storageKey);
-                }
 
                 // 데이터(seatNum) 기반으로 남은 학생들 명시된 좌석에 먼저 배치 (우선 적용)
                 Object.values(currentStudentMap).forEach(s => {
@@ -1382,10 +1347,6 @@
                     const firstEmpty = gridSeats.indexOf(null);
                     if (firstEmpty !== -1) gridSeats[firstEmpty] = s;
                 });
-
-                // 현재 상태 저장 (공간 인덱스 그대로 저장)
-                const idArr = gridSeats.map(val => (val && val.학번) ? val.학번 : (val === null ? "" : undefined));
-                localStorage.setItem(storageKey, JSON.stringify(idArr));
 
                 const section = document.createElement('div');
                 section.className = 'classroom-section';
@@ -1427,7 +1388,6 @@
 
                     const seat = document.createElement('div');
                     seat.className = 'seat' + (student ? '' : ' empty') + (isAbsent ? ' absent' : '');
-                    seat.setAttribute('draggable', student ? 'true' : 'false');
                     seat.setAttribute('data-index', i);
 
                     if (student) {
@@ -1443,35 +1403,10 @@
                         seat.innerHTML = `<div class="seat-num-badge empty"></div>`;
                     }
 
-                    seat.addEventListener('dragstart', handleDragStart);
-                    seat.addEventListener('dragover', handleDragOver);
-                    seat.addEventListener('dragleave', handleDragLeave);
-                    seat.addEventListener('drop', handleDrop);
                     grid.appendChild(seat);
                 });
                 display.appendChild(section);
             });
-        }
-
-        let draggedElement = null;
-        function handleDragStart(e) { draggedElement = this; e.dataTransfer.setData('text/plain', this.dataset.index); this.style.opacity = '0.4'; }
-        function handleDragOver(e) { e.preventDefault(); this.classList.add('drag-over'); }
-        function handleDragLeave() { this.classList.remove('drag-over'); }
-        function handleDrop(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-            if (draggedElement) draggedElement.style.opacity = '1';
-            const sIdx = parseInt(e.dataTransfer.getData('text/plain'));
-            const tIdx = parseInt(this.dataset.index);
-            const sRoom = draggedElement.parentElement.parentElement.dataset.room;
-            const tRoom = this.parentElement.parentElement.dataset.room;
-            if (sRoom !== tRoom || sIdx === tIdx) return;
-            const k = `yajaArrangement1_${currentDay}_${sRoom}_P${currentPeriod}`;
-            let arr = JSON.parse(localStorage.getItem(k));
-            [arr[sIdx], arr[tIdx]] = [arr[tIdx], arr[sIdx]];
-            localStorage.setItem(k, JSON.stringify(arr));
-            showToast();
-            renderSeating();
         }
 
         function showToast() {
@@ -1494,16 +1429,6 @@
             renderSeating();
         }
 
-
-        function resetArrangement() {
-            if (!confirm(`현재 요일(${currentDay}) ${currentPeriod}교시의 모든 배치를 고정 좌석으로 초기화하시겠습니까?`)) return;
-            const rooms = ['1-3', '1-4', '1-5', '1-6'];
-            rooms.forEach(room => {
-                localStorage.removeItem(`yajaArrangement1_${currentDay}_${room}_P${currentPeriod}`);
-            });
-            showToast();
-            renderSeating();
-        }
 
         function resetAttendance() {
             if (!confirm(`현재 요일(${currentDay})의 ${currentPeriod}교시 출석 데이터를 모두 초기화하시겠습니까?`)) return;
