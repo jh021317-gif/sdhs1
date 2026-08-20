@@ -1046,7 +1046,7 @@
     <div id="mainApp" style="display: none;">
 
         <header>
-            <h1>2026학년도 1학년 1학기 자기주도적 학습 자리 배치도</h1>
+            <h1>2026학년도 1학년 2학기 자기주도적 학습 자리 배치도</h1>
             <div class="controls">
                 <div class="btn-group" id="dayButtons">
                     <button class="btn day-btn active" data-day="월">월요일</button>
@@ -1057,7 +1057,7 @@
                 </div>
                 <div class="btn-group">
                     <button class="btn btn-primary" id="btnSaveAllSheets" onclick="saveAllAttendanceToSheet()"
-                        style="background: #0f172a; border-color: #0f172a; color: white;">💾 1-5, 1-6 시트 동시 전송</button>
+                        style="background: #0f172a; border-color: #0f172a; color: white;">💾 출결 시트에 전송</button>
                     <button class="btn btn-primary" onclick="window.print()">🖨️ A4 인쇄하기</button>
                     <button class="btn btn-primary" onclick="printGuide()" style="background: #10b981; border-color: #10b981; color: white;">📋 학생 안내용 출력</button>
                     <button class="btn btn-danger" id="btnResetAttendance" onclick="resetAttendance()">🗑️ 결석
@@ -1073,7 +1073,7 @@
                     style="display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%;">
                     <div style="display: flex; gap: 8px;">
                         <span>💡</span>
-                        <span>결석한 학생만 체크하신 후, '1-5, 1-6 시트 동시 전송' 버튼을 클릭해주세요.</span>
+                        <span>결석한 학생만 체크하신 후, '출결 시트에 전송' 버튼을 클릭해주세요.</span>
                     </div>
                     <div
                         style="font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 10px; margin-left: auto;">
@@ -1454,7 +1454,7 @@
                 return;
             }
 
-            if (!confirm(`1-5반, 1-6반의 ${currentPeriod}교시 결석 데이터를 Google 시트로 동시 전송하시겠습니까?`)) return;
+            if (!confirm(`${currentPeriod}교시 결석 데이터를 Google 시트로 전송하시겠습니까?`)) return;
 
             const btn = document.getElementById('btnSaveAllSheets');
             if (btn) {
@@ -1506,14 +1506,14 @@
             if (errorCount > 0) {
                 alert(`전송 완료: 성공 ${successCount}건, 실패 ${errorCount}건.\n콘솔 로그를 확인해주세요.`);
             } else if (successCount > 0) {
-                alert(`1-5교시, 1-6교시의 ${currentPeriod}교시 데이터 전송이 완료되었습니다! (구글 시트에서 확인해 주세요)`);
+                alert(`${currentPeriod}교시 데이터 전송이 완료되었습니다! (구글 시트에서 확인해 주세요)`);
             } else {
-                alert(`전송할 1-5, 1-6 학생 데이터가 없습니다.`);
+                alert(`전송할 학생 데이터가 없습니다.`);
             }
 
             if (btn) {
                 btn.disabled = false;
-                btn.innerText = '💾 1-5, 1-6 시트 동시 전송';
+                btn.innerText = '💾 출결 시트에 전송';
             }
         }
 
