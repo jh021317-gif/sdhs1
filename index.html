@@ -1269,35 +1269,61 @@
         }
 
         const ROOM_CONFIGS = {
-            '1-5': { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] },
-            '1-6': { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] },
-            '1-3': { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] },
-            '1-4': { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] }
+            '1-6': { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] }
         };
 
+        function getGridIndexFromSeatNum(seatNum) {
+            if (seatNum >= 1 && seatNum <= 4) {
+                return (seatNum - 1) * 8 + 0;
+            } else if (seatNum >= 5 && seatNum <= 8) {
+                return (seatNum - 5) * 8 + 1;
+            } else if (seatNum >= 9 && seatNum <= 13) {
+                return (seatNum - 9) * 8 + 3;
+            } else if (seatNum >= 14 && seatNum <= 18) {
+                return (seatNum - 14) * 8 + 4;
+            } else if (seatNum >= 19 && seatNum <= 23) {
+                return (seatNum - 19) * 8 + 6;
+            } else if (seatNum >= 24 && seatNum <= 28) {
+                return (seatNum - 24) * 8 + 7;
+            }
+            return -1;
+        }
+
+        function getDefaultNumFromGridIndex(i) {
+            const col = i % 8;
+            const row = Math.floor(i / 8);
+            if (col === 0 && row < 4) return row + 1;
+            if (col === 1 && row < 4) return row + 5;
+            if (col === 3) return row + 9;
+            if (col === 4) return row + 14;
+            if (col === 6) return row + 19;
+            if (col === 7) return row + 24;
+            return "";
+        }
+
         function getRoomStudents(day, period) {
-            const results = { '1-3': [], '1-4': [], '1-5': [], '1-6': [] };
+            const results = { '1-6': [] };
             if (!globalData || globalData.length === 0) return results;
 
             const dayMap = {'월': 0, '화': 1, '수': 2, '목': 3, '금': 4};
-            if(dayMap[day] === undefined) return results;
+            if (dayMap[day] === undefined) return results;
             
-            // 3: 월1위치, 4: 월2위치, 5: 월교실
-            const baseOff = 3 + dayMap[day] * 3;
+            // CSV columns:
+            // 0: 순번, 1: 학번, 2: 이름
+            // 3: 월1, 4: 월2, 5: 화1, 6: 화2, 7: 수1, 8: 수2, 9: 목1, 10: 목2, 11: 금1, 12: 금2
+            const baseOff = 3 + dayMap[day] * 2;
             const seatCol = period === '1' ? baseOff : baseOff + 1;
-            const roomCol = baseOff + 2;
 
             globalData.forEach(row => {
                 const seatStr = (row[seatCol] || "").trim();
-                const roomStr = (row[roomCol] || "").trim();
                 
-                if (seatStr && seatStr !== "" && roomStr) {
+                if (seatStr && seatStr !== "") {
                     const seatNum = parseInt(seatStr, 10);
-                    if (results[roomStr]) {
-                        results[roomStr].push({ 
-                            학번: row[1], 
-                            이름: row[2], 
-                            seatNum: !isNaN(seatNum) ? seatNum : null
+                    if (!isNaN(seatNum)) {
+                        results['1-6'].push({ 
+                            학번: (row[1] || "").trim(), 
+                            이름: (row[2] || "").trim(), 
+                            seatNum: seatNum
                         });
                     }
                 }
@@ -1309,47 +1335,49 @@
             const display = document.getElementById('seatingDisplay');
             display.innerHTML = '';
             const roomStudents = getRoomStudents(currentDay, currentPeriod);
-            const rooms = ['1-3', '1-4', '1-5', '1-6'];
+            const rooms = ['1-6'];
 
             rooms.forEach(roomName => {
-                const students = roomStudents[roomName];
-                if (students.length === 0 && (roomName === '1-3' || roomName === '1-4')) return;
-
+                const students = roomStudents[roomName] || [];
                 const config = ROOM_CONFIGS[roomName] || { cols: 6, maxRows: 5, gridCols: [0, 1, 3, 4, 6, 7] };
 
                 // 총 그리드 슬롯 계산 (5행 * 8열 = 40개 슬롯)
                 let gridSeats = new Array(config.maxRows * 8).fill(undefined);
 
-                // 1. 좌석 위치 설정 (6개 분단, 각 5행 = 30석)
-                config.gridCols.forEach((gCol) => {
-                    for (let r = 0; r < config.maxRows; r++) {
-                        gridSeats[r * 8 + gCol] = null;
+                // 유효 좌석 슬롯 초기화 (null로 설정)
+                // 1열(0): 0~3행, 2열(1): 0~3행 (4행은 빈 공간)
+                // 3열(3), 4열(4), 5열(6), 6열(7): 0~4행
+                [0, 1].forEach(col => {
+                    for (let r = 0; r < 4; r++) {
+                        gridSeats[r * 8 + col] = null;
+                    }
+                });
+                [3, 4, 6, 7].forEach(col => {
+                    for (let r = 0; r < 5; r++) {
+                        gridSeats[r * 8 + col] = null;
                     }
                 });
 
                 const currentStudentMap = {};
                 students.forEach(s => currentStudentMap[s.학번] = s);
 
-                // 데이터(seatNum) 기반으로 남은 학생들 명시된 좌석에 먼저 배치 (우선 적용)
+                // 1. 배정된 seatNum 위치에 학생 우선 배치
                 Object.values(currentStudentMap).forEach(s => {
                     if (s.seatNum) {
-                        const cIdx = Math.floor((s.seatNum - 1) / 5);
-                        const row = (s.seatNum - 1) % 5;
-                        if (cIdx < config.gridCols.length) {
-                            const col = config.gridCols[cIdx];
-                            const gridIdx = row * 8 + col;
-                            if (gridSeats[gridIdx] === null) {
-                                gridSeats[gridIdx] = s;
-                                delete currentStudentMap[s.학번];
-                            }
+                        const gridIdx = getGridIndexFromSeatNum(s.seatNum);
+                        if (gridIdx !== -1 && gridSeats[gridIdx] === null) {
+                            gridSeats[gridIdx] = s;
+                            delete currentStudentMap[s.학번];
                         }
                     }
                 });
 
-                // 그래도 남은 학생 배치 (이미 배정 안 된 학생은 빈자리에 순서대로)
+                // 2. 혹시 남아있는 학생이 있다면 빈 좌석에 순차 배치
                 Object.values(currentStudentMap).forEach(s => {
                     const firstEmpty = gridSeats.indexOf(null);
-                    if (firstEmpty !== -1) gridSeats[firstEmpty] = s;
+                    if (firstEmpty !== -1) {
+                        gridSeats[firstEmpty] = s;
+                    }
                 });
 
                 const section = document.createElement('div');
@@ -1383,6 +1411,7 @@
 
                     if (student === undefined) {
                         const emptySlot = document.createElement('div');
+                        emptySlot.className = 'seat-placeholder';
                         emptySlot.style.visibility = 'hidden';
                         grid.appendChild(emptySlot);
                         return;
@@ -1396,9 +1425,10 @@
                     seat.className = 'seat' + (student ? '' : ' empty') + (isAbsent ? ' absent' : '');
                     seat.setAttribute('data-index', i);
 
+                    const defaultNum = getDefaultNumFromGridIndex(i);
+
                     if (student) {
-                        // 학생 번호 표시 (CSV의 seatNum 또는 1-indexed 순서)
-                        const displayNum = student.seatNum || "";
+                        const displayNum = student.seatNum || defaultNum;
                         seat.innerHTML = `
                             <div class="student-id">${student.학번}</div>
                             <div class="student-name">${student.이름}</div>
@@ -1406,7 +1436,7 @@
                         `;
                         seat.onclick = () => toggleAttendance(student.학번, roomName);
                     } else {
-                        seat.innerHTML = `<div class="seat-num-badge empty"></div>`;
+                        seat.innerHTML = `<div class="seat-num-badge empty">${defaultNum}</div>`;
                     }
 
                     grid.appendChild(seat);
@@ -1435,10 +1465,9 @@
             renderSeating();
         }
 
-
         function resetAttendance() {
             if (!confirm(`현재 요일(${currentDay})의 ${currentPeriod}교시 출석 데이터를 모두 초기화하시겠습니까?`)) return;
-            const rooms = ['1-3', '1-4', '1-5', '1-6'];
+            const rooms = ['1-6'];
             rooms.forEach(room => {
                 const key = `yajaAttendance1_${currentDay}_${room}_P${currentPeriod}`;
                 localStorage.removeItem(key);
@@ -1463,7 +1492,7 @@
             }
 
             const roomStudents = getRoomStudents(currentDay, currentPeriod);
-            const targets = ['1-5', '1-6'];
+            const targets = ['1-6'];
             let successCount = 0;
             let errorCount = 0;
 
@@ -1578,13 +1607,12 @@
                     html += `<td><strong>${row[2]}</strong></td>`;
                     
                     for (let day = 0; day < 5; day++) {
-                        const baseIdx = 3 + day * 3;
+                        const baseIdx = 3 + day * 2;
                         const seat1 = row[baseIdx] ? row[baseIdx].trim() : '';
                         const seat2 = row[baseIdx+1] ? row[baseIdx+1].trim() : '';
-                        const room = row[baseIdx+2] ? row[baseIdx+2].trim() : '';
 
-                        const disp1 = seat1 ? `${room}<br><b>${seat1}번</b>` : '-';
-                        const disp2 = seat2 ? `${room}<br><b>${seat2}번</b>` : '-';
+                        const disp1 = seat1 ? `1-6<br><b>${seat1}번</b>` : '-';
+                        const disp2 = seat2 ? `1-6<br><b>${seat2}번</b>` : '-';
 
                         html += `<td>${disp1}</td><td>${disp2}</td>`;
                     }
