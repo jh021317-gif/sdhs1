@@ -1412,7 +1412,7 @@
                         return;
                     }
 
-                    const attendanceKey = `yajaAttendance1_${currentDay}_${roomName}_P${currentPeriod}`;
+                    const attendanceKey = getAttendanceKey(roomName);
                     const savedAttendance = JSON.parse(localStorage.getItem(attendanceKey)) || {};
                     const isAbsent = student && savedAttendance[student.학번]?.checked;
 
@@ -1440,6 +1440,18 @@
             });
         }
 
+        function getTodayDateStr() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getAttendanceKey(roomName) {
+            return `yajaAttendance1_${getTodayDateStr()}_${currentDay}_${roomName}_P${currentPeriod}`;
+        }
+
         function showToast() {
             const toast = document.getElementById('toast');
             toast.classList.add('show');
@@ -1447,7 +1459,7 @@
         }
 
         function toggleAttendance(studentId, roomName) {
-            const attendanceKey = `yajaAttendance1_${currentDay}_${roomName}_P${currentPeriod}`;
+            const attendanceKey = getAttendanceKey(roomName);
             const savedAttendance = JSON.parse(localStorage.getItem(attendanceKey)) || {};
 
             if (!savedAttendance[studentId]) {
@@ -1464,7 +1476,7 @@
             if (!confirm(`현재 요일(${currentDay})의 ${currentPeriod}교시 출석 데이터를 모두 초기화하시겠습니까?`)) return;
             const rooms = ['1-6'];
             rooms.forEach(room => {
-                const key = `yajaAttendance1_${currentDay}_${room}_P${currentPeriod}`;
+                const key = getAttendanceKey(room);
                 localStorage.removeItem(key);
             });
             showToast();
@@ -1495,11 +1507,11 @@
                 const studentsInRoom = roomStudents[roomName];
                 if (!studentsInRoom || studentsInRoom.length === 0) continue;
 
-                const attendanceKey = `yajaAttendance1_${currentDay}_${roomName}_P${currentPeriod}`;
+                const attendanceKey = getAttendanceKey(roomName);
                 const savedAttendance = JSON.parse(localStorage.getItem(attendanceKey)) || {};
 
                 const attendanceData = {
-                    date: new Date().toISOString().split('T')[0],
+                    date: getTodayDateStr(),
                     day: currentDay,
                     period: currentPeriod + '교시',
                     room: roomName,
